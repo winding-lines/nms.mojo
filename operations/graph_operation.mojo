@@ -69,5 +69,5 @@ struct NonMaximumSupression:
             scores_layout,
             bitmap_layout,
             0.7,
-        )
+             )
 
