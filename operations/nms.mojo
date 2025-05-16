@@ -69,14 +69,14 @@ fn nms_gpu[
             if (
                 score[i] > score[j]
                 and _iou(
-                    corners[i][0],
-                    corners[i][1],
-                    corners[i][2],
-                    corners[i][3],
-                    corners[j][0],
-                    corners[j][1],
-                    corners[j][2],
-                    corners[j][3],
+                    rebind[Scalar[dtype]](corners[i][0]),
+                    rebind[Scalar[dtype]](corners[i][1]),
+                    rebind[Scalar[dtype]](corners[i][2]),
+                    rebind[Scalar[dtype]](corners[i][3]),
+                    rebind[Scalar[dtype]](corners[j][0]),
+                    rebind[Scalar[dtype]](corners[j][1]),
+                    rebind[Scalar[dtype]](corners[j][2]),
+                    rebind[Scalar[dtype]](corners[j][3]),
                 )
                 > iou_threshold
             ):

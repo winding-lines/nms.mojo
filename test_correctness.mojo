@@ -39,6 +39,7 @@ def test_nms(ctx: DeviceContext) -> None:
         var scores_tensor = LayoutTensor[float_dtype, flat_layout](scores_host)
         var keep_tensor = LayoutTensor[keep_dtype, flat_layout](keep_host)
         for row in range(N):
+            # Setup all the bounding boxes to overlap.
             corners_tensor[row,0] = 0.0
             corners_tensor[row,1] = 0.0
             corners_tensor[row,2] = 1.0
@@ -78,6 +79,7 @@ def test_nms(ctx: DeviceContext) -> None:
         for i in range(N):
             if host_tensor[i] == 1:
                 count += 1
+        # We should have kept just one bounding box.
         assert_equal(count, 1)
 
 
