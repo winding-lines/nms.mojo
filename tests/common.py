@@ -21,10 +21,10 @@ from max.graph import DeviceRef, Graph, TensorType, ops
 from max.engine import InferenceSession
 
 
-def matrix_multiplication(
-    a: NDArray[np.float32],
-    b: NDArray[np.float32],
-    algorithm: str,
+def nms(
+    corners: NDArray[np.float32],
+    scores: NDArray[np.float32],
+    iou_threshold: float,
     session: InferenceSession,
     device: Device,
 ) -> Tensor:
@@ -32,44 +32,43 @@ def matrix_multiplication(
 
     # Create driver tensors from the input arrays, and move them to the
     # accelerator.
-    a_tensor = Tensor.from_numpy(a).to(device)
-    b_tensor = Tensor.from_numpy(b).to(device)
+    corners_tensor = Tensor.from_numpy(corners).to(device)
+    scores_tensor = Tensor.from_numpy(scores).to(device)
 
     mojo_kernels = Path(__file__).parent.parent / "operations"
+    assert mojo_kernels.exists()
 
     # Configure our simple one-operation graph.
     with Graph(
-        "matrix_multiplication_graph",
+        "nms_graph",
         input_types=[
             TensorType(
                 dtype,
-                shape=a_tensor.shape,
+                shape=corners_tensor.shape,
                 device=DeviceRef.from_device(device),
             ),
             TensorType(
                 dtype,
-                shape=b_tensor.shape,
+                shape=scores_tensor.shape,
                 device=DeviceRef.from_device(device),
             ),
         ],
         custom_extensions=[mojo_kernels],
     ) as graph:
         # Take in the two inputs to the graph.
-        a_value, b_value = graph.inputs
-        # The matrix multiplication custom operation takes in two matrices and
-        # produces a result, with the specific algorithm that is used chosen
-        # via compile-time parameterization.
+        corners_value, scores_value = graph.inputs
         output = ops.custom(
-            name="matrix_multiplication",
-            values=[a_value, b_value],
+            name="nms",
+            values=[corners_value, scores_value, ops.constant(
+                iou_threshold, DType.float32, DeviceRef.CPU())],
             out_types=[
                 TensorType(
-                    dtype=a_value.tensor.dtype,
-                    shape=[a_value.tensor.shape[0], b_value.tensor.shape[1]],
+                    dtype=DType.uint8,
+                    shape=[scores_value.tensor.shape[0]],
                     device=DeviceRef.from_device(device),
                 )
             ],
-            parameters={"algorithm": algorithm},
+            parameters={},
         )[0].tensor
         graph.output(output)
 
@@ -79,7 +78,7 @@ def matrix_multiplication(
 
     # Perform the calculation on the target device.
     print("Executing...")
-    result = model.execute(a_tensor, b_tensor)[0]
+    result = model.execute(corners_value, scores_value)[0]
 
     # Copy values back to the CPU to be read.
     assert isinstance(result, Tensor)

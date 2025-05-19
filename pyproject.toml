@@ -35,7 +35,7 @@ pytest = "pytest"
 pytest = ">=8.3.2, <9"
 
 [tool.pixi.dependencies]
-max = "==25.3.0.dev2025042905"
+max = "*"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

@@ -8,3 +8,4 @@ pixi.lock
 .venv
 # build products
 operations.mojopkg
+__pycache__

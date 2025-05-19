@@ -37,6 +37,7 @@ from utils import IndexList
 # Note: change this to the ID of the GPU you will use.
 alias DEVICE_ID = 0
 
+
 # Wrap a ManagedTensorSlice with a DeviceBuffer which has a lifetime to use
 # Mojo's memory management, and sidestep the Python initialized garbage
 # collected version.

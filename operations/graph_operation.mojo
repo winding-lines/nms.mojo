@@ -17,9 +17,10 @@ from math import ceildiv
 from memory import UnsafePointer
 from runtime.asyncrt import DeviceContextPtr
 from tensor import InputTensor, OutputTensor
-from .nms import nms_gpu
+from .nms import nms
 
-@compiler.register("non_maximum_supression")
+
+@compiler.register("nms")
 struct NonMaximumSupression:
     """
     The custom operation for NMS.
@@ -49,7 +50,9 @@ struct NonMaximumSupression:
         gpu_ctx.enqueue_memset(
             DeviceBuffer[keep_bitmap.type](
                 gpu_ctx,
-                rebind[UnsafePointer[Scalar[keep_bitmap.type]]](bitmap_layout.ptr),
+                rebind[UnsafePointer[Scalar[keep_bitmap.type]]](
+                    bitmap_layout.ptr
+                ),
                 size,
                 owning=False,
             ),
@@ -58,7 +61,7 @@ struct NonMaximumSupression:
 
         alias BN = 32
         gpu_ctx.enqueue_function[
-            nms_gpu[
+            nms[
                 corners.type,
                 corners_layout.layout,
                 scores_layout.layout,
@@ -69,5 +72,6 @@ struct NonMaximumSupression:
             scores_layout,
             bitmap_layout,
             0.7,
-             )
-
+            grid_dim=(1, 1),
+            block_dim=(256, 1),
+        )

@@ -11,38 +11,50 @@ from layout.tensor_builder import LayoutTensorBuild as tb
 from tensor import InputTensor, ManagedTensorSlice, OutputTensor
 from sys.info import simdwidthof
 
+alias X_MIN = 0
+alias Y_MIN = 1
+alias X_MAX = 2
+alias Y_MAX = 3
 
-fn _iou[
-    type: DType
+alias BBOX_LAYOUT = Layout.row_major(4)
+
+
+fn iou[
+    dtype: DType, f_layout: Layout, s_layout: Layout
 ](
-    ax1: Scalar[type],
-    ay1: Scalar[type],
-    ax2: Scalar[type],
-    ay2: Scalar[type],
-    bx1: Scalar[type],
-    by1: Scalar[type],
-    bx2: Scalar[type],
-    by2: Scalar[type],
-) -> Scalar[type]:
+    first: LayoutTensor[dtype, f_layout, MutableAnyOrigin],
+    second: LayoutTensor[dtype, s_layout, MutableAnyOrigin],
+    out res: __type_of(first.dtype),
+):
     """Compute the intersection_over_union between the 2 boxes."""
-    if ax1 > bx2 or bx1 > ax2 or ay1 > by2 or by1 > ay2:
-        return 0
+    var fx1 = rebind[Scalar[dtype]](first[X_MIN])
+    var sx2 = rebind[Scalar[dtype]](second[X_MAX])
+    if (
+        fx1 > sx2
+        or second[X_MIN] > first[X_MAX]
+        or first[Y_MIN] > second[Y_MAX]
+        or second[Y_MIN] > first[Y_MAX]
+    ):
+        res = 0
+        return
 
-    var x_start = max(ax1, bx1)
-    var x_end = min(ax2, bx2)
-    var y_start = max(ay1, by1)
-    var y_end = min(ay2, by2)
+    var x_start = max(first[X_MIN], second[X_MIN])
+    var x_end = min(first[X_MAX], second[X_MAX])
+    var y_start = max(first[Y_MIN], second[Y_MIN])
+    var y_end = min(first[Y_MAX], second[Y_MAX])
 
     var intersection = (x_end - x_start) * (y_end - y_start)
 
-    var union = (ax2 - ax1) * (ay2 - ay1) + (bx2 - bx1) * (
-        by2 - by1
+    var union = (first[X_MAX] - first[X_MIN]) * (
+        first[Y_MAX] - first[Y_MIN]
+    ) + (second[X_MAX] - second[X_MIN]) * (
+        second[Y_MAX] - second[Y_MIN]
     ) - intersection
 
-    return intersection / union
+    res = intersection / union
 
 
-fn nms_gpu[
+fn nms[
     dtype: DType,
     corners_layout: Layout,
     score_layout: Layout,
@@ -52,32 +64,53 @@ fn nms_gpu[
         dtype, corners_layout, MutableAnyOrigin
     ],  # x1, y1, x2, y2
     score: LayoutTensor[dtype, score_layout, MutableAnyOrigin],
-    keep_bitmap: LayoutTensor[dtype, bitmap_layout, MutableAnyOrigin],
+    keep_bitmap: LayoutTensor[DType.uint8, bitmap_layout, MutableAnyOrigin],
     iou_threshold: Scalar[dtype],
 ):
     """Process NMS on the GPU."""
     var pos = block_dim.x * block_idx.x + thread_idx.x
     var size = corners.shape[0]()
+    if pos >= size:
+        return
+    # print("thread_idx.x", thread_idx.x, "pos", pos, " size ", size, "keep_bitmap", keep_bitmap[pos],"iou_threshold", iou_threshold)
+    if pos == 0:
+        print("keep_tensor gpu", keep_bitmap.load[16](0, 0))
 
-    for stride in range(size // 2):
-        var i = (stride + 1) * pos
-        var j = (stride + 1) * pos + pos - 1
+    for stride in range(1, size // 2):
+        var i = pos
+        var j = i + stride
         j = j % size
 
-        if ( keep_bitmap[i] != 0 and keep_bitmap[j] != 0):
+        if i == j:
+            continue
+
+        if pos == 0:
+            print(
+                "pos ",
+                pos,
+                "stride",
+                stride,
+                "i",
+                i,
+                "keep[i]",
+                keep_bitmap[i, 0],
+                "score",
+                score[i, 0],
+                "  j",
+                j,
+                "keep[j]",
+                keep_bitmap[j, 0],
+                "score[j]",
+                score[j, 0],
+            )
+        if keep_bitmap[i, 0] != 0 and keep_bitmap[j, 0] != 0:
             # Compute the intersection area.
-            if (
-                score[i] > score[j]
-                and _iou(
-                    rebind[Scalar[dtype]](corners[i][0]),
-                    rebind[Scalar[dtype]](corners[i][1]),
-                    rebind[Scalar[dtype]](corners[i][2]),
-                    rebind[Scalar[dtype]](corners[i][3]),
-                    rebind[Scalar[dtype]](corners[j][0]),
-                    rebind[Scalar[dtype]](corners[j][1]),
-                    rebind[Scalar[dtype]](corners[j][2]),
-                    rebind[Scalar[dtype]](corners[j][3]),
+            if score[i, 0] >= score[j, 0]:
+                var first = corners.tile[1, 4](i, 0)
+                var second = corners.tile[1, 4](j, 0)
+                var overlap = iou[dtype, first.layout, second.layout](
+                    first, second
                 )
-                > iou_threshold
-            ):
-                keep_bitmap[j] = 0
+                if overlap > iou_threshold:
+                    keep_bitmap[j, 0] = 0
+                    print("discarding box", j)

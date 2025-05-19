@@ -5,6 +5,21 @@ has started during the Mojo Hackathon in May 2025 based on a template provided b
 
 Only the `magic run test` is used at the moment.
 
+## Algorithm
+
+The input to the module are two tensors:
+- the corners of the bounding boxes with shape N, 4 (x\_low, y\_low, x\_high, y\_high)
+- the scores for each box
+
+There is also a parameter named iou\_threshold, where iou is Intersection Over Union.
+
+For the bounding boxes that overlap sufficiently, i.e. iou > iou\_threshold, only the bounding box with the 
+higher score will be kept.
+
+## Current status
+
+A keep\_bitmap tensor of uint8 with shape N is returned. The value will be 1 for the bounding boxes to keep, 0 to discard.
+
 ## Running tests ##
 
 There are both Mojo unit tests and `pytest`-based Python unit tests in this

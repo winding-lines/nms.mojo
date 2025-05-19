@@ -15,38 +15,18 @@ import numpy as np
 from max.driver import Accelerator, CPU, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
-from .common import matrix_multiplication
+from .common import nms
 
 
-def test_naive_matmul(session: InferenceSession) -> None:
-    M = 256
-    K = 256
+def test_nms(session: InferenceSession) -> None:
     N = 256
 
-    a = np.random.uniform(size=(M, K)).astype(np.float32)
-    b = np.random.uniform(size=(K, N)).astype(np.float32)
-    expected_result = a @ b
+    corners = np.random.uniform(size=(N, 4)).astype(np.float32)
+    scores = np.random.uniform(size=(N)).astype(np.float32)
+    expected_result = np.random.uniform(size=(N)).astype(np.uint8)
 
-    naive_result = matrix_multiplication(a, b, "naive", session, session.devices[0])
+    result = nms(corners, scores, 0.7, session, session.devices[0])
 
-    assert np.all(np.isclose(naive_result.to_numpy(), expected_result))
-    assert naive_result.dtype == DType.float32
-    assert naive_result.shape == (M, N)
-
-
-def test_optimized_matmul(session: InferenceSession) -> None:
-    M = 256
-    K = 256
-    N = 256
-
-    a = np.random.uniform(size=(M, K)).astype(np.float32)
-    b = np.random.uniform(size=(K, N)).astype(np.float32)
-    expected_result = a @ b
-
-    optimized_result = matrix_multiplication(
-        a, b, "optimized", session, session.devices[0]
-    )
-
-    assert np.all(np.isclose(optimized_result.to_numpy(), expected_result))
-    assert optimized_result.dtype == DType.float32
-    assert optimized_result.shape == (M, N)
+    assert np.all(np.isclose(result.to_numpy(), expected_result))
+    assert result.dtype == DType.uint8
+    assert result.shape == (N,)
