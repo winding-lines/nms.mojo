@@ -24,8 +24,7 @@ fn iou[
 ](
     first: LayoutTensor[dtype, f_layout, MutableAnyOrigin],
     second: LayoutTensor[dtype, s_layout, MutableAnyOrigin],
-    out res: __type_of(first.dtype),
-):
+) -> first.element_type:
     """Compute the intersection_over_union between the 2 boxes."""
     var fx1 = rebind[Scalar[dtype]](first[X_MIN])
     var sx2 = rebind[Scalar[dtype]](second[X_MAX])
@@ -35,8 +34,7 @@ fn iou[
         or first[Y_MIN] > second[Y_MAX]
         or second[Y_MIN] > first[Y_MAX]
     ):
-        res = 0
-        return
+        return 0
 
     var x_start = max(first[X_MIN], second[X_MIN])
     var x_end = min(first[X_MAX], second[X_MAX])
