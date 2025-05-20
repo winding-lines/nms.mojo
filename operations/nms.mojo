@@ -22,8 +22,22 @@ alias BBOX_LAYOUT = Layout.row_major(4)
 fn iou[
     dtype: DType, f_layout: Layout, s_layout: Layout
 ](
-    first: LayoutTensor[dtype, f_layout, MutableAnyOrigin],
-    second: LayoutTensor[dtype, s_layout, MutableAnyOrigin],
+    first: LayoutTensor[
+        dtype,
+        f_layout,
+        MutableAnyOrigin,
+        layout_int_type=_,
+        linear_idx_type=_,
+        masked=_,
+    ],
+    second: LayoutTensor[
+        dtype,
+        s_layout,
+        MutableAnyOrigin,
+        layout_int_type=_,
+        linear_idx_type=_,
+        masked=_,
+    ],
 ) -> first.element_type:
     """Compute the intersection_over_union between the 2 boxes."""
     var fx1 = rebind[Scalar[dtype]](first[X_MIN])
@@ -49,7 +63,7 @@ fn iou[
         second[Y_MAX] - second[Y_MIN]
     ) - intersection
 
-    res = intersection / union
+    return intersection / union
 
 
 fn nms[
@@ -106,9 +120,7 @@ fn nms[
             if score[i, 0] >= score[j, 0]:
                 var first = corners.tile[1, 4](i, 0)
                 var second = corners.tile[1, 4](j, 0)
-                var overlap = iou[dtype, first.layout, second.layout](
-                    first, second
-                )
+                var overlap = iou(first, second)
                 if overlap > iou_threshold:
                     keep_bitmap[j, 0] = 0
                     print("discarding box", j)
