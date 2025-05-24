@@ -20,34 +20,34 @@ alias BBOX_LAYOUT = Layout.row_major(4)
 
 
 fn iou[
-    dtype: DType, f_layout: Layout, s_layout: Layout
+        dtype: DType, f_layout: Layout, s_layout: Layout, layout_int_type: DType, linear_idx_type: DType
 ](
     first: LayoutTensor[
         dtype,
         f_layout,
         MutableAnyOrigin,
-        layout_int_type=_,
-        linear_idx_type=_,
+        layout_int_type=layout_int_type,
+        linear_idx_type=linear_idx_type,
         masked=_,
     ],
     second: LayoutTensor[
         dtype,
         s_layout,
         MutableAnyOrigin,
-        layout_int_type=_,
-        linear_idx_type=_,
+        layout_int_type=layout_int_type,
+        linear_idx_type=linear_idx_type,
         masked=_,
     ],
 ) -> first.element_type:
     """Compute the intersection_over_union between the 2 boxes."""
-    var fx1 = rebind[Scalar[dtype]](first[X_MIN])
-    var sx2 = rebind[Scalar[dtype]](second[X_MAX])
+    print("iou: entering")
     if (
-        fx1 > sx2
+        first[X_MIN] > second[X_MAX]
         or second[X_MIN] > first[X_MAX]
         or first[Y_MIN] > second[Y_MAX]
         or second[Y_MIN] > first[Y_MAX]
     ):
+        print("iou: non overlap, returning 0")
         return 0
 
     var x_start = max(first[X_MIN], second[X_MIN])
@@ -63,7 +63,10 @@ fn iou[
         second[Y_MAX] - second[Y_MIN]
     ) - intersection
 
-    return intersection / union
+    var result = intersection / union
+
+    print("iou: overlap ", result)
+    return result
 
 
 fn nms[
@@ -84,9 +87,6 @@ fn nms[
     var size = corners.shape[0]()
     if pos >= size:
         return
-    # print("thread_idx.x", thread_idx.x, "pos", pos, " size ", size, "keep_bitmap", keep_bitmap[pos],"iou_threshold", iou_threshold)
-    if pos == 0:
-        print("keep_tensor gpu", keep_bitmap.load[16](0, 0))
 
     for stride in range(1, size // 2):
         var i = pos
@@ -98,7 +98,7 @@ fn nms[
 
         if pos == 0:
             print(
-                "pos ",
+                "nms: pos ",
                 pos,
                 "stride",
                 stride,
@@ -114,13 +114,17 @@ fn nms[
                 keep_bitmap[j, 0],
                 "score[j]",
                 score[j, 0],
+                " score i > j",
+                score[i, 0] >= score[j, 0]
             )
         if keep_bitmap[i, 0] != 0 and keep_bitmap[j, 0] != 0:
             # Compute the intersection area.
             if score[i, 0] >= score[j, 0]:
                 var first = corners.tile[1, 4](i, 0)
                 var second = corners.tile[1, 4](j, 0)
+                print("nms: calling iou")
                 var overlap = iou(first, second)
+                print("nms: iou returned overlap", overlap)
                 if overlap > iou_threshold:
                     keep_bitmap[j, 0] = 0
-                    print("discarding box", j)
+                    print("nms: discarding box", j)

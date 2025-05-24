@@ -23,7 +23,7 @@ alias DEVICE_ID = 0
 
 
 def test_nms(ctx: DeviceContext) -> None:
-    alias N = 16
+    alias N = 4
 
     alias corners_layout = Layout.row_major(N, 4)
     alias flat_layout = Layout.row_major(N, 1)
@@ -56,7 +56,7 @@ def test_nms(ctx: DeviceContext) -> None:
 
             keep_tensor[row, 0] = 1
 
-        print("keep_tensor cpu", keep_tensor)
+        print("test: keep_tensor cpu", keep_tensor)
 
     var corners_tensor = LayoutTensor[float_dtype, corners_layout](
         corners_buffer
@@ -64,7 +64,7 @@ def test_nms(ctx: DeviceContext) -> None:
     var scores_tensor = LayoutTensor[float_dtype, flat_layout](scores_buffer)
     var keep_tensor = LayoutTensor[keep_dtype, flat_layout](keep_buffer)
 
-    alias BN = 16
+    alias BN = 2
     ctx.enqueue_function[
         nms[
             float_dtype,
@@ -87,7 +87,7 @@ def test_nms(ctx: DeviceContext) -> None:
 
     with keep_buffer.map_to_host() as host_buffer:
         var host_tensor = LayoutTensor[keep_dtype, flat_layout](host_buffer)
-        print("after call, on the cpu", host_buffer)
+        print("test: after call, on the cpu", host_buffer)
         var count = 0
         for i in range(N):
             if host_tensor[i, 0] == 1:
@@ -96,14 +96,43 @@ def test_nms(ctx: DeviceContext) -> None:
         assert_equal(count, 1)
 
 
-# def test_iou() -> None:
-#     assert_equal(iou[DType.float32](0,0,1,2,0,0,1,2), 1.0)
+# def test_iou(ctx: DeviceContext) -> None:
+#     alias N = 2
+#
+#     alias corners_layout = Layout.row_major(N, 4)
+#
+#     alias float_dtype = DType.float32
+#
+#     var corners_buffer = ctx.enqueue_create_buffer[float_dtype](
+#         corners_layout.size()
+#     )
+#
+#     with corners_buffer.map_to_host() as corners_host:
+#         var corners_tensor = LayoutTensor[float_dtype, corners_layout, layout_int_type=DType.uint32](
+#             corners_host
+#         )
+#         for row in range(N):
+#             # Setup all the bounding boxes to overlap.
+#             corners_tensor[row, 0] = 0.0 
+#             corners_tensor[row, 1] = 0.0
+#             corners_tensor[row, 2] = 1.0
+#             corners_tensor[row, 3] = 1.0
+#
+#
+#     var corners_tensor = LayoutTensor[float_dtype, corners_layout](
+#         corners_buffer
+#     )
+#
+#     var first = corners_tensor.tile[1,4](0,0)
+#     var second = corners_tensor.tile[1,4](1,0)
+#     var overlap = iou[layout_int_type=DType.uint32, linear_idx_type=DType.uint32](first, second)
+#     assert_equal(overlap, 1.0)
 
 
 def main():
-    # test_iou()
 
     @parameter
     if has_amd_gpu_accelerator() or has_nvidia_gpu_accelerator():
         var gpu_ctx = DeviceContext(device_id=DEVICE_ID)
+        # test_iou(gpu_ctx)
         test_nms(gpu_ctx)
