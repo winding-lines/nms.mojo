@@ -76,7 +76,7 @@ def test_nms(ctx: DeviceContext) -> None:
         corners_tensor,
         scores_tensor,
         keep_tensor,
-        0.7,
+        Float32(0.7),
         grid_dim=(
             1,
             1,

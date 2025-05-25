@@ -65,8 +65,8 @@ fn iou[
 
     var result = intersection / union
 
-    print("iou: overlap ", result)
-    return result
+    return 1.0
+    # return result
 
 
 fn nms[
@@ -80,7 +80,7 @@ fn nms[
     ],  # x1, y1, x2, y2
     score: LayoutTensor[dtype, score_layout, MutableAnyOrigin],
     keep_bitmap: LayoutTensor[DType.uint8, bitmap_layout, MutableAnyOrigin],
-    iou_threshold: Scalar[dtype],
+    iou_threshold: Float32,
 ):
     """Process NMS on the GPU."""
     var pos = block_dim.x * block_idx.x + thread_idx.x
@@ -125,6 +125,6 @@ fn nms[
                 print("nms: calling iou")
                 var overlap = iou(first, second)
                 print("nms: iou returned overlap", overlap)
-                if overlap > iou_threshold:
+                if Float32(overlap[0]) > iou_threshold:
                     keep_bitmap[j, 0] = 0
                     print("nms: discarding box", j)
