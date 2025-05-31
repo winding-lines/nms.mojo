@@ -56,8 +56,6 @@ def test_nms(ctx: DeviceContext) -> None:
 
             keep_tensor[row, 0] = 1
 
-        print("test: keep_tensor cpu", keep_tensor)
-
     var corners_tensor = LayoutTensor[float_dtype, corners_layout](
         corners_buffer
     )
@@ -87,7 +85,6 @@ def test_nms(ctx: DeviceContext) -> None:
 
     with keep_buffer.map_to_host() as host_buffer:
         var host_tensor = LayoutTensor[keep_dtype, flat_layout](host_buffer)
-        print("test: after call, on the cpu", host_buffer)
         var count = 0
         for i in range(N):
             if host_tensor[i, 0] == 1:

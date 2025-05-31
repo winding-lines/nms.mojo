@@ -40,33 +40,30 @@ fn iou[
     ],
 ) -> first.element_type:
     """Compute the intersection_over_union between the 2 boxes."""
-    print("iou: entering")
     if (
-        first[X_MIN] > second[X_MAX]
-        or second[X_MIN] > first[X_MAX]
-        or first[Y_MIN] > second[Y_MAX]
-        or second[Y_MIN] > first[Y_MAX]
+        first[0, X_MIN] > second[0, X_MAX]
+        or second[0, X_MIN] > first[0, X_MAX]
+        or first[0, Y_MIN] > second[0, Y_MAX]
+        or second[0, Y_MIN] > first[0, Y_MAX]
     ):
-        print("iou: non overlap, returning 0")
         return 0
 
-    var x_start = max(first[X_MIN], second[X_MIN])
-    var x_end = min(first[X_MAX], second[X_MAX])
-    var y_start = max(first[Y_MIN], second[Y_MIN])
-    var y_end = min(first[Y_MAX], second[Y_MAX])
+    var x_start = max(first[0, X_MIN], second[0, X_MIN])
+    var x_end = min(first[0, X_MAX], second[0, X_MAX])
+    var y_start = max(first[0, Y_MIN], second[0, Y_MIN])
+    var y_end = min(first[0, Y_MAX], second[0, Y_MAX])
 
     var intersection = (x_end - x_start) * (y_end - y_start)
 
-    var union = (first[X_MAX] - first[X_MIN]) * (
-        first[Y_MAX] - first[Y_MIN]
-    ) + (second[X_MAX] - second[X_MIN]) * (
-        second[Y_MAX] - second[Y_MIN]
+    var union = (first[0, X_MAX] - first[0, X_MIN]) * (
+        first[0, Y_MAX] - first[0, Y_MIN]
+    ) + (second[0, X_MAX] - second[0, X_MIN]) * (
+        second[0, Y_MAX] - second[0, Y_MIN]
     ) - intersection
 
     var result = intersection / union
 
-    return 1.0
-    # return result
+    return result 
 
 
 fn nms[
@@ -96,35 +93,14 @@ fn nms[
         if i == j:
             continue
 
-        if pos == 0:
-            print(
-                "nms: pos ",
-                pos,
-                "stride",
-                stride,
-                "i",
-                i,
-                "keep[i]",
-                keep_bitmap[i, 0],
-                "score",
-                score[i, 0],
-                "  j",
-                j,
-                "keep[j]",
-                keep_bitmap[j, 0],
-                "score[j]",
-                score[j, 0],
-                " score i > j",
-                score[i, 0] >= score[j, 0]
-            )
         if keep_bitmap[i, 0] != 0 and keep_bitmap[j, 0] != 0:
             # Compute the intersection area.
-            if score[i, 0] >= score[j, 0]:
+            if score[i, 0] <= score[j, 0]:
                 var first = corners.tile[1, 4](i, 0)
                 var second = corners.tile[1, 4](j, 0)
-                print("nms: calling iou")
                 var overlap = iou(first, second)
-                print("nms: iou returned overlap", overlap)
                 if Float32(overlap[0]) > iou_threshold:
-                    keep_bitmap[j, 0] = 0
-                    print("nms: discarding box", j)
+                    # if almost equal keep the box with the higher index.
+                    if abs(score[0,i]-score[0,j]) < 1e4 and i>j:
+                        continue
+                    keep_bitmap[i, 0] = 0
